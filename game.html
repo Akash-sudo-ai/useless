@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delay the Inevitable</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            touch-action: none; /* Prevents scrolling on touch devices */
+        }
+        .game-container {
+            position: relative; /* Needed for positioning elements */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        canvas {
+            /* background-color will be set by JS */
+            border: 4px solid #f0f0f0;
+            border-radius: 8px;
+            cursor: grab;
+            transition: background-color 1s linear;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .draggable-word {
+            cursor: grab;
+            position: relative;
+            z-index: 10;
+            padding: 0 5px;
+            transition: opacity 0.2s;
+        }
+        .draggable-word:active {
+            cursor: grabbing;
+        }
+        #winScreen {
+            background-color: rgba(0, 0, 0, 0.85);
+            border-radius: 12px;
+            border: 4px solid #2ECC40;
+        }
+        #winMessage {
+             line-height: 1.6;
+        }
+        .button {
+            background-color: #ff4136;
+            color: #ffffff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px #c2332a;
+            text-decoration: none;
+        }
+        .button:hover {
+            background-color: #ff635b;
+        }
+        .button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #c2332a;
+        }
+        .button.menu-button {
+            background-color: #0074D9;
+            box-shadow: 0 4px #005ea6;
+        }
+        .button.menu-button:hover {
+            background-color: #008aff;
+        }
+        .button.menu-button:active {
+            box-shadow: 0 2px #005ea6;
+        }
+        #pauseButton {
+            background-color: #FF851B; /* Orange */
+            box-shadow: 0 4px #e07517;
+            /* Styling for symbol */
+            font-size: 1.25rem;
+            line-height: 1;
+            padding: 10px 14px;
+        }
+        #pauseButton:hover {
+            background-color: #ff9c42;
+        }
+        #pauseButton:active {
+            box-shadow: 0 2px #e07517;
+        }
+        #thoughtBubble {
+            position: absolute;
+            transform: translateX(-50%);
+            background-color: white;
+            color: black;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none; /* Make it unclickable */
+            white-space: nowrap;
+        }
+        #thoughtBubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 8px 0;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+        #miniMapContainer {
+            width: 80%;
+            max-width: 400px;
+            height: 10px;
+            background-color: #444;
+            border: 2px solid #fff;
+            position: relative;
+            border-radius: 5px;
+        }
+        #miniMapPlayer {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #FFFFFF; /* Hero color */
+            border-radius: 50%;
+            top: -1px; /* Center it on the border */
+        }
+        #miniMapGoal {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #FF4136; /* Goal color */
+            border-radius: 50%;
+            top: -1px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container text-center">
+    <div id="gameTitleContainer" class="text-2xl md:text-3xl flex flex-wrap justify-center gap-x-4">
+        <span class="draggable-word">He</span>
+        <span class="draggable-word">cannot</span>
+        <span class="draggable-word">be</span>
+        <span class="draggable-word">stopped.</span>
+    </div>
+    <div id="miniMapContainer">
+        <div id="miniMapPlayer"></div>
+        <div id="miniMapGoal"></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="thoughtBubble"></div>
+
+    <button id="pauseButton" class="button absolute top-5 right-5 z-20"></button>
+
+    <div id="winScreen" class="absolute inset-0 items-center justify-center p-8 text-center hidden flex-col gap-6">
+        <h2 class="text-4xl md:text-6xl text-green-400">THE HERO WINS!</h2>
+        <p id="winMessage" class="text-lg md:text-xl">Your efforts were admirable, but futile.</p>
+        <div class="flex flex-col md:flex-row gap-4 mt-4">
+            <button id="resetButton" class="button">Fail Again</button>
+            <a href="index.html" class="button menu-button">Main Menu</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- SETUP ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const winScreen = document.getElementById('winScreen');
+    const resetButton = document.getElementById('resetButton');
+    const thoughtBubble = document.getElementById('thoughtBubble');
+    const wordElements = document.querySelectorAll('.draggable-word');
+    const miniMapPlayer = document.getElementById('miniMapPlayer');
+    const miniMapGoal = document.getElementById('miniMapGoal');
+    const pauseButton = document.getElementById('pauseButton');
+    const winMessage = document.getElementById('winMessage');
+
+    const pauseSymbol = '\u23F8'; // ⏸
+    const resumeSymbol = '\u25B6'; // ▶
+
+    let canvasWidth = window.innerWidth > 1200 ? 1200 : window.innerWidth * 0.95;
+    let canvasHeight = canvasWidth * 0.5;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // --- AUDIO SETUP ---
+    let soundsReady = false;
+    const jumpSynth = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.1 } }).toDestination();
+    
+    const musicSynth = new Tone.MonoSynth({
+        oscillator: { type: 'pulse', width: 0.2 },
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.4 },
+        filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.1, baseFrequency: 300, octaves: 4 }
+    }).toDestination();
+    musicSynth.volume.value = -20;
+
+    const musicPattern = new Tone.Pattern(function(time, note) {
+        musicSynth.triggerAttackRelease(note, '16n', time);
+    }, ["C3", "E3", "G3", "C4", "G3", "E3", "C3", null], "up");
+    musicPattern.interval = "16n";
+
+    function startAudio() {
+        if (!soundsReady) {
+            Tone.start();
+            Tone.Transport.start();
+            musicPattern.start(0);
+            soundsReady = true;
+        }
+    }
+    document.body.addEventListener('mousedown', startAudio);
+    document.body.addEventListener('touchstart', startAudio);
+
+    // --- GAME STATE & OBJECTS ---
+    let gameEnded = false;
+    let isPaused = false;
+    let selectedObject = null;
+    let mouseOffset = { x: 0, y: 0 };
+    let cameraX = 0;
+    const worldWidth = canvas.width * 3; 
+    let isDay = true;
+
+    // --- SCORE TRACKING VARIABLES ---
+    let startTime = 0;
+    let objectsPlaced = 0;
+    let helpfulActions = 0;
+
+    const hero = {
+        x: 50, y: canvas.height - 80,
+        width: 30, height: 40,
+        color: '#FFFFFF',
+        baseVx: 1.6, vx: 1.6, vy: 0,
+        onGround: false, wantsToJump: false,
+        reactionTimer: 0, emotion: 'neutral', happyTimer: 0,
+        thought: '', thoughtTimer: 0, runCycle: 0,
+        isBoosted: false, boostTimer: 0,
+        isSlowed: false, isRefreshed: false, refreshedTimer: 0,
+        jumpType: 'normal'
+    };
+
+    const goal = {
+        x: worldWidth - 200, y: canvas.height - 180,
+        width: 150, height: 80,
+        color: '#FF4136'
+    };
+
+    const ground = {
+        x: 0, y: canvas.height - 40,
+        width: worldWidth, height: 40,
+        color: '#AAAAAA'
+    };
+
+    let manipulatableObjects = [];
+    let backgroundStars = [];
+
+    function initializeObjects() {
+        // Reset Hero State
+        hero.x = 50; hero.y = canvas.height - 80;
+        hero.vx = hero.baseVx; hero.vy = 0;
+        hero.wantsToJump = false; hero.reactionTimer = 0;
+        hero.emotion = 'neutral'; hero.happyTimer = 0;
+        hero.thought = ''; hero.thoughtTimer = 0;
+        hero.isBoosted = false; hero.boostTimer = 0;
+        hero.isSlowed = false; hero.isRefreshed = false; hero.refreshedTimer = 0;
+        hero.jumpType = 'normal';
+        
+        cameraX = 0; isDay = true;
+        goal.x = worldWidth - 200;
+        
+        manipulatableObjects = [
+            { type: 'sun', x: 100, y: 60, width: 60, height: 60, color: '#FFDC00', movedByPlayer: false },
+            { type: 'cloud', x: 300, y: 80, width: 120, height: 50, color: '#FFFFFF', movedByPlayer: false },
+            { type: 'cloud', x: 900, y: 100, width: 150, height: 60, color: '#FFFFFF', movedByPlayer: false },
+            { type: 'cloud', x: 1800, y: 70, width: 100, height: 40, color: '#FFFFFF', movedByPlayer: false },
+        ];
+
+        for (let x = 400; x < worldWidth - 400; x += Math.random() * 250 + 250) {
+            const typeChance = Math.random();
+            
+            if (typeChance < 0.5) { // 50% Platform
+                const isTall = Math.random() > 0.7;
+                const y = Math.random() * (canvas.height - 150) + 50;
+                manipulatableObjects.push({
+                    type: 'platform', x: x, y: isTall ? y - 60 : y,
+                    width: isTall ? 20 : 100, height: isTall ? 120 : 20,
+                    color: isTall ? '#FF851B' : '#FFDC00', movedByPlayer: false
+                });
+            } else if (typeChance < 0.7) { // 20% Trampoline
+                 const y = Math.random() * (canvas.height - 150) + 50;
+                manipulatableObjects.push({
+                    type: 'trampoline', x: x, y: y, width: 80, height: 20, color: '#FF4136', movedByPlayer: false
+                });
+            } else if (typeChance < 0.85) { // 15% Speed Boost
+                 const y = Math.random() * (canvas.height - 150) + 50;
+                manipulatableObjects.push({
+                    type: 'speed_boost', x: x, y: y, width: 60, height: 20, color: '#966F33', movedByPlayer: false
+                });
+            } else { // 15% Mud Puddle
+                const mudHeight = 15;
+                manipulatableObjects.push({
+                    type: 'mud_puddle', x: x, y: ground.y - mudHeight,
+                    width: 150, height: mudHeight, color: '#654321', movedByPlayer: false
+                });
+            }
+        }
+        
+        wordElements.forEach(word => {
+            word.style.opacity = '1';
+            word.style.transform = 'translate(0, 0)';
+        });
+
+        backgroundStars = [];
+        for (let i = 0; i < 100; i++) {
+            backgroundStars.push({
+                x: Math.random() * worldWidth, y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1, parallax: Math.random() * 0.5 + 0.1
+            });
+        }
+    }
+
+    const gravity = 0.5;
+    const jumpPower = -11;
+    const highJumpPower = -14;
+    const trampolineJumpPower = -16;
+    
+    function speak(text) {
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.pitch = 1.2; utterance.rate = 1.3; utterance.volume = 0.7;
+        speechSynthesis.speak(utterance);
+    }
+
+    const thoughts = {
+        angry: ["Try something new!", "Is that all?", "You can't stop me!"],
+        happy: ["Haha!", "Too easy!", "Inevitable!"],
+        confused: ["Helping me?", "Hmm...?", "Thanks?"],
+        night: ["I can't see!", "It's so dark..."],
+        day: ["I'm not blind anymore!"],
+        refreshed: ["Ah, refreshing!", "A mud bath!", "Invigorating!"]
+    };
+
+    function setThought(thoughtType) {
+        const thoughtList = thoughts[thoughtType];
+        hero.thought = thoughtList[Math.floor(Math.random() * thoughtList.length)];
+        hero.thoughtTimer = 120;
+        if (soundsReady) speak(hero.thought);
+    }
+
+    function checkAABBCollision(rect1, rect2) {
+        return rect1.x < rect2.x + rect2.width &&
+               rect1.x + rect1.width > rect2.x &&
+               rect1.y < rect2.y + rect2.height &&
+               rect1.y + rect1.height > rect2.y;
+    }
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+        const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    }
+
+    function handleMouseDown(evt) {
+        if (gameEnded) return;
+
+        if (evt.target.classList.contains('draggable-word')) {
+            const wordElement = evt.target;
+            const wordRect = wordElement.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            const newWordObject = {
+                type: 'word', text: wordElement.innerText,
+                x: (wordRect.left - canvasRect.left) * (canvas.width / canvasRect.width) + cameraX,
+                y: (wordRect.top - canvasRect.top) * (canvas.height / canvasRect.height),
+                width: wordRect.width * (canvas.width / canvasRect.width),
+                height: wordRect.height * (canvas.height / canvasRect.height),
+                color: '#FFFFFF', movedByPlayer: true
+            };
+            manipulatableObjects.push(newWordObject);
+            selectedObject = newWordObject;
+            wordElement.style.opacity = '0';
+            const mousePos = getMousePos(evt);
+            mouseOffset.x = mousePos.x + cameraX - newWordObject.x;
+            mouseOffset.y = mousePos.y - newWordObject.y;
+            return;
+        }
+
+        const mousePos = getMousePos(evt);
+        for (let i = manipulatableObjects.length - 1; i >= 0; i--) {
+            const obj = manipulatableObjects[i];
+            const screenX = obj.x - cameraX;
+            const screenY = obj.y;
+            if (mousePos.x > screenX && mousePos.x < screenX + obj.width &&
+                mousePos.y > screenY && mousePos.y < screenY + obj.height) {
+                selectedObject = obj;
+                mouseOffset.x = mousePos.x + cameraX - obj.x;
+                mouseOffset.y = mousePos.y - obj.y;
+                break;
+            }
+        }
+    }
+
+    function handleMouseMove(evt) {
+        if (gameEnded) return;
+        if (selectedObject) {
+            selectedObject.movedByPlayer = true;
+            const mousePos = getMousePos(evt);
+            selectedObject.x = mousePos.x + cameraX - mouseOffset.x;
+            selectedObject.y = mousePos.y - mouseOffset.y;
+        }
+    }
+
+    function handleMouseUp() {
+        if (selectedObject) {
+            objectsPlaced++;
+            if (selectedObject.type === 'sun') {
+                isDay = false; setThought('night');
+                manipulatableObjects = manipulatableObjects.filter(obj => obj.type !== 'sun');
+                manipulatableObjects.push({ type: 'moon', x: cameraX + 100, y: 60, width: 50, height: 50, color: '#E0E0E0', movedByPlayer: true });
+            } else if (selectedObject.type === 'moon') {
+                isDay = true; setThought('day');
+                manipulatableObjects = manipulatableObjects.filter(obj => obj.type !== 'moon');
+                manipulatableObjects.push({ type: 'sun', x: cameraX + 100, y: 60, width: 60, height: 60, color: '#FFDC00', movedByPlayer: true });
+            }
+        }
+        selectedObject = null;
+    }
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchstart', (e) => handleMouseDown(e.touches[0]));
+    document.addEventListener('touchmove', (e) => handleMouseMove(e.touches[0]));
+    document.addEventListener('touchend', handleMouseUp);
+    document.addEventListener('touchcancel', handleMouseUp);
+
+    function drawHero() {
+        ctx.strokeStyle = hero.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const headRadius = 8;
+        const headX = hero.x + hero.width / 2;
+        const headY = hero.y + headRadius;
+        const bodyTopY = headY + headRadius;
+        const bodyBottomY = hero.y + hero.height * 0.7;
+        ctx.moveTo(headX, bodyTopY);
+        ctx.lineTo(headX, bodyBottomY);
+        
+        const armSwing = Math.sin(hero.runCycle) * 10;
+        const armY = hero.y + hero.height * 0.4;
+        ctx.moveTo(headX, armY);
+        ctx.lineTo(headX - armSwing, armY + 5);
+        ctx.moveTo(headX, armY);
+        ctx.lineTo(headX + armSwing, armY + 5);
+
+        const legSwing = Math.sin(hero.runCycle) * 8;
+        const legBottomY = hero.y + hero.height;
+        ctx.moveTo(headX, bodyBottomY);
+        ctx.lineTo(headX - legSwing, legBottomY);
+        ctx.moveTo(headX, bodyBottomY);
+        ctx.lineTo(headX + legSwing, legBottomY);
+        ctx.stroke();
+
+        ctx.fillStyle = canvas.style.backgroundColor;
+        ctx.beginPath();
+        ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = hero.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        switch (hero.emotion) {
+            case 'happy': case 'refreshed':
+                ctx.arc(headX - 3, headY - 1, 1, 0, Math.PI * 2);
+                ctx.arc(headX + 3, headY - 1, 1, 0, Math.PI * 2);
+                ctx.moveTo(headX - 4, headY + 2);
+                ctx.quadraticCurveTo(headX, headY + 5, headX + 4, headY + 2);
+                break;
+            case 'angry':
+                ctx.arc(headX - 3, headY, 1, 0, Math.PI * 2);
+                ctx.arc(headX + 3, headY, 1, 0, Math.PI * 2);
+                ctx.moveTo(headX - 5, headY - 4); ctx.lineTo(headX - 1, headY - 2);
+                ctx.moveTo(headX + 1, headY - 2); ctx.lineTo(headX + 5, headY - 4);
+                ctx.moveTo(headX - 3, headY + 4); ctx.lineTo(headX + 3, headY + 4);
+                break;
+            default:
+                ctx.arc(headX - 3, headY, 1, 0, Math.PI * 2);
+                ctx.arc(headX + 3, headY, 1, 0, Math.PI * 2);
+                ctx.moveTo(headX - 3, headY + 4); ctx.lineTo(headX + 3, headY + 4);
+                break;
+        }
+        ctx.stroke();
+    }
+
+    function drawGoal() {
+        ctx.fillStyle = goal.color;
+        ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+        ctx.font = "24px 'Press Start 2P'";
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("FINISH", goal.x + goal.width / 2, goal.y + goal.height / 2);
+        const poleWidth = 10;
+        const poleX = goal.x - poleWidth;
+        const poleY = goal.y;
+        const poleHeight = (canvas.height - 40) - goal.y;
+        ctx.fillStyle = '#966F33';
+        ctx.fillRect(poleX, poleY, poleWidth, poleHeight);
+    }
+    
+    function drawHeroThoughts() {
+        if (hero.thoughtTimer > 0) {
+            thoughtBubble.style.opacity = '1';
+            thoughtBubble.innerText = hero.thought;
+            const canvasRect = canvas.getBoundingClientRect();
+            const heroScreenX = (hero.x - cameraX) + hero.width / 2;
+            const bubbleX = (heroScreenX / canvas.width) * canvasRect.width;
+            const bubbleY = (hero.y / canvas.height) * canvasRect.height - 30;
+            thoughtBubble.style.left = `${bubbleX}px`;
+            thoughtBubble.style.top = `${bubbleY}px`;
+        } else {
+            thoughtBubble.style.opacity = '0';
+        }
+    }
+    
+    function drawBackground() {
+        if (!isDay) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            backgroundStars.forEach(star => {
+                const screenX = star.x - (cameraX * star.parallax);
+                const wrappedX = (screenX % worldWidth + worldWidth) % worldWidth;
+                ctx.fillRect(wrappedX, star.y, star.size, star.size);
+            });
+        }
+    }
+
+    function update() {
+        if (gameEnded) return;
+
+        if (isPaused) {
+            if (goal.x > hero.x + hero.width / 2) {
+                goal.x -= 3;
+            }
+        } else {
+            // --- HERO STATE AND TIMERS ---
+            hero.emotion = 'neutral';
+            if (hero.happyTimer > 0) { hero.happyTimer--; hero.emotion = 'happy'; }
+            if (hero.thoughtTimer > 0) { hero.thoughtTimer--; }
+            if (hero.isRefreshed) { hero.emotion = 'refreshed'; }
+
+            // --- AI LOGIC (RUNS BEFORE MOVEMENT) ---
+            const feeler = { x: hero.x + hero.width, y: hero.y, width: 5, height: hero.height };
+            let detectedObstacle = null;
+            manipulatableObjects.forEach(obj => {
+                if (obj.type !== 'speed_boost' && obj.type !== 'mud_puddle' && checkAABBCollision(feeler, obj)) {
+                    detectedObstacle = obj;
+                }
+            });
+            if (detectedObstacle && hero.onGround && !hero.wantsToJump) {
+                hero.wantsToJump = true; 
+                hero.reactionTimer = 15;
+                hero.emotion = 'angry'; 
+                setThought('angry');
+                hero.jumpType = (detectedObstacle.height > 100) ? 'tall' : 'normal';
+            }
+            if (hero.wantsToJump) {
+                hero.reactionTimer--; 
+                hero.emotion = 'angry';
+                if (hero.reactionTimer <= 0) {
+                    hero.vy = (hero.jumpType === 'tall') ? highJumpPower : jumpPower;
+                    if (soundsReady) jumpSynth.triggerAttackRelease("C4", "8n");
+                    hero.onGround = false; 
+                    hero.wantsToJump = false;
+                    hero.happyTimer = 30; 
+                    setThought('happy');
+                }
+            }
+            
+            // --- SPEED CALCULATION ---
+            let currentSpeed = hero.baseVx + ((hero.x / worldWidth) * 1.0);
+            currentSpeed += isDay ? 0.5 : -0.4;
+            hero.vx = currentSpeed;
+            if (hero.isBoosted) {
+                hero.vx *= 1.5;
+                hero.boostTimer--;
+                if (hero.boostTimer <= 0) hero.isBoosted = false;
+            }
+            if (hero.isSlowed) hero.vx *= 0.4;
+            if (hero.isRefreshed) {
+                hero.vx *= 1.8;
+                hero.refreshedTimer--;
+                if (hero.refreshedTimer <= 0) hero.isRefreshed = false;
+            }
+            hero.runCycle += 0.25;
+
+            // --- NEW: AXIS-SEPARATED PHYSICS ---
+
+            // 1. HORIZONTAL MOVEMENT & COLLISION
+            hero.x += hero.vx;
+            manipulatableObjects.forEach(obj => {
+                if (obj.type === 'platform' || obj.type === 'word') {
+                    if (checkAABBCollision(hero, obj)) {
+                        // Since hero only moves right, push him back to the left edge of the object
+                        hero.x = obj.x - hero.width;
+                    }
+                }
+            });
+
+            // 2. VERTICAL MOVEMENT & COLLISION
+            hero.vy += gravity;
+            hero.y += hero.vy;
+            hero.onGround = false; // Assume we are in the air
+
+            if (hero.y + hero.height > ground.y) {
+                hero.y = ground.y - hero.height;
+                hero.vy = 0;
+                hero.onGround = true;
+            }
+            manipulatableObjects.forEach(obj => {
+                if (obj.type === 'platform' || obj.type === 'trampoline' || obj.type === 'word') {
+                     if (checkAABBCollision(hero, obj)) {
+                        if (hero.vy > 0 && (hero.y - hero.vy) + hero.height <= obj.y) { // LANDING
+                            hero.y = obj.y - hero.height;
+                            hero.vy = 0;
+                            hero.onGround = true;
+                            if (obj.movedByPlayer) { helpfulActions++; }
+                            if (obj.type === 'trampoline') {
+                                hero.vy = trampolineJumpPower;
+                                hero.onGround = false; hero.happyTimer = 30; setThought('happy');
+                            }
+                        } else if (hero.vy < 0) { // HITTING HEAD
+                            hero.y = obj.y + obj.height;
+                            hero.vy = 0;
+                        }
+                    }
+                }
+            });
+            
+            // 3. TOUCH-BASED EFFECTS
+            const wasSlowed = hero.isSlowed;
+            let touchingPuddle = false;
+            manipulatableObjects.forEach(obj => {
+                if (checkAABBCollision(hero, obj)) {
+                    if (obj.type === 'mud_puddle') {
+                        touchingPuddle = true;
+                    } else if (obj.type === 'speed_boost' && !hero.isBoosted) {
+                        hero.isBoosted = true; hero.boostTimer = 180; setThought('confused');
+                    }
+                }
+            });
+            hero.isSlowed = touchingPuddle;
+            if (wasSlowed && !hero.isSlowed) {
+                hero.isRefreshed = true;
+                hero.refreshedTimer = 180;
+                setThought('refreshed');
+            }
+
+            // --- CAMERA ---
+            cameraX = hero.x - 150;
+            if (cameraX < 0) cameraX = 0;
+            if (cameraX > worldWidth - canvas.width) cameraX = worldWidth - canvas.width;
+            miniMapPlayer.style.left = `calc(${(hero.x / worldWidth) * 100}% - 5px)`;
+            const sun = manipulatableObjects.find(obj => obj.type === 'sun');
+            if (sun && !selectedObject) sun.x = cameraX + 100;
+            const moon = manipulatableObjects.find(obj => obj.type === 'moon');
+            if (moon && !selectedObject) moon.x = cameraX + 100;
+        } 
+
+        // --- SHARED LOGIC ---
+        miniMapGoal.style.left = `calc(${(goal.x / worldWidth) * 100}% - 5px)`;
+
+        if (!gameEnded && hero.x + hero.width / 2 >= goal.x) {
+            gameEnded = true;
+            hero.vx = 0;
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            winMessage.innerHTML = `You delayed the inevitable by <b>${duration}</b> seconds.<br>Objects Placed: <b>${objectsPlaced}</b><br>Times You Helped: <b>${helpfulActions}</b>`;
+            winScreen.classList.remove('hidden');
+            winScreen.classList.add('flex');
+            pauseButton.style.display = 'none';
+        }
+        
+        // --- DRAWING ---
+        canvas.style.backgroundColor = isDay ? '#87CEEB' : '#1a2a4f';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+
+        ctx.fillStyle = ground.color;
+        ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+        drawGoal();
+        manipulatableObjects.forEach(obj => {
+            ctx.fillStyle = obj.color;
+            if (obj.type === 'sun' || obj.type === 'moon') {
+                ctx.beginPath();
+                ctx.arc(obj.x + obj.width/2, obj.y + obj.height/2, obj.width/2, 0, Math.PI * 2);
+                ctx.fill();
+                if(obj.type === 'moon') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.beginPath();
+                    ctx.arc(obj.x + obj.width*0.7, obj.y + obj.height*0.3, obj.width*0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(obj.x + obj.width*0.3, obj.y + obj.height*0.6, obj.width*0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (obj.type === 'cloud') {
+                ctx.beginPath();
+                ctx.arc(obj.x + obj.width*0.25, obj.y + obj.height*0.4, obj.width*0.25, 0, Math.PI * 2);
+                ctx.arc(obj.x + obj.width*0.5, obj.y + obj.height*0.3, obj.width*0.35, 0, Math.PI * 2);
+                ctx.arc(obj.x + obj.width*0.75, obj.y + obj.height*0.4, obj.width*0.25, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (obj.type === 'word') {
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                ctx.font = "24px 'Press Start 2P'";
+                ctx.fillStyle = obj.color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(obj.text, obj.x + obj.width / 2, obj.y + obj.height / 2);
+            } else {
+                 ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+            }
+        });
+        drawHero();
+        
+        ctx.restore();
+        drawHeroThoughts();
+        requestAnimationFrame(update);
+    }
+    
+    function resetGame() {
+        gameEnded = false;
+        isPaused = false;
+        pauseButton.innerHTML = pauseSymbol;
+        pauseButton.style.display = 'block';
+        winScreen.classList.add('hidden');
+        winScreen.classList.remove('flex');
+        speechSynthesis.cancel();
+        
+        startTime = Date.now();
+        objectsPlaced = 0;
+        helpfulActions = 0;
+        winMessage.innerHTML = "Your efforts were admirable, but futile.";
+
+        initializeObjects();
+        update();
+    }
+
+    resetButton.addEventListener('click', () => {
+        if (!gameEnded) return;
+        resetGame();
+    });
+
+    pauseButton.addEventListener('click', () => {
+        if (gameEnded) return;
+        isPaused = !isPaused;
+        pauseButton.innerHTML = isPaused ? resumeSymbol : pauseSymbol;
+    });
+    
+    startTime = Date.now();
+    pauseButton.innerHTML = pauseSymbol;
+    initializeObjects();
+    update();
+</script>
+
+</body>
+</html>
+what is the formula for calculating gravitational force

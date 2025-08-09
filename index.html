@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Inevitable HERO - Menu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .menu-container {
+            max-width: 600px;
+            padding: 20px;
+        }
+        #startButton {
+            background-color: #2ECC40; /* Green */
+            color: #ffffff;
+            border: none;
+            padding: 16px 32px;
+            margin-top: 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 5px #25a234;
+        }
+        #startButton:hover {
+            background-color: #3bdd50;
+        }
+        #startButton:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px #25a234;
+        }
+    </style>
+</head>
+<body>
+
+<div class="menu-container">
+    <h1 class="text-4xl md:text-6xl mb-4">The Inevitable HERO</h1>
+    <p class="text-base md:text-lg">
+        Guess what? You are not the hero. You are the one who denies him.
+    </p>
+    <a href="game.html" id="startButton">Begin</a>
+</div>
+
+</body>
+</html>
