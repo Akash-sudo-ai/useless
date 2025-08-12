@@ -38,7 +38,7 @@ A normal laptop has used to make this project, no further hardware tools were ne
 ### Implementation
 For Software:
 # Installation
-[commands]
+There is no need of additional installion of files to run this game.(This game can run in almost every web browser)
 
 # Run
 [commands]
