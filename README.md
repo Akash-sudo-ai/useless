@@ -14,7 +14,7 @@
 
 
 ### Project Description
-The Inevitable Hero is a unique anti-platformer where you don't play as the hero. Instead, your goal is to stop the unstoppable by dragging and dropping obstacles into his path, only to watch your efforts hilariously backfire as he inevitably reaches his goal.
+The Inevitable Hero is a unique anti-platformer where you don't play as the hero. Instead, your goal is to stop the unstoppable by dragging and dropping obstacles into his path, only to watch your efforts hilariously backfire as he inevitably reaches his goal.The level itself is the tool for us and the creativity can change every run special.Think outside the box, even the Game UI is your tools -Stop the hero at all cost.
 
 ### The Problem (that doesn't exist)
 In the game "The Inevitable Hero" the ridiculous problem you're solving is how to stop an unstoppable force using tools that actively help it succeed. 
